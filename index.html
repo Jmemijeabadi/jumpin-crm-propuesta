@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Jump-In CRM · Presentación cinematográfica · Bongo Assistant 🐵</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* ============================================================
+     Jump-In CRM — Presentación cinematográfica por ESCENAS
+     Cada escena = pantalla completa, una idea, visual protagonista.
+     100% NAVEGABLE (clic / flecha) — sin autoplay.
+     Las animaciones se disparan al ENTRAR a la escena.
+     ============================================================ */
+  :root {
+    --radius: 1rem;
+    --bg: #0e0a1a;            /* fondo cine oscuro (las escenas claras invierten) */
+    --ink: #1c1530;
+    --ink-soft: #6b6480;
+    --line: #efe6f3;
+    --surface: #ffffff;
+
+    --orange: #ff7a1a;
+    --purple: #7b2ff7;
+    --cyan: #00bcd4;
+    --pink: #ff4d8d;
+    --green: #1fbf75;
+    --yellow: #ffc83d;
+    --red: #ef4444;
+
+    --font: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --display: "Fredoka", var(--font);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font);
+    background: #000;
+    color: #fff;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  /* ===== Mecánica de escenas ===== */
+  .stage { position: fixed; inset: 0; }
+  .scene {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: flex-start;
+    padding: 76px clamp(28px, 9vw, 150px) 104px;   /* deja aire para HUD (arriba) y controles (abajo) */
+    opacity: 0; visibility: hidden;
+    transition: opacity .5s ease, visibility .5s;
+    overflow-y: auto; overflow-x: hidden;   /* si no cabe, se hace scroll en vez de cortarse */
+    -webkit-overflow-scrolling: touch;
+  }
+  .scene.active { opacity: 1; visibility: visible; }
+  /* margin auto vertical: centra cuando cabe, y deja scroll cuando no cabe */
+  .scene .inner { width: 100%; max-width: 1100px; margin: auto; position: relative; z-index: 2; }
+  .scene.center { align-items: center; text-align: center; }
+  .scene.center .inner { text-align: center; }
+  /* scrollbar discreto */
+  .scene::-webkit-scrollbar { width: 8px; }
+  .scene::-webkit-scrollbar-thumb { background: rgba(255,255,255,.18); border-radius: 8px; }
+  .scene.light::-webkit-scrollbar-thumb { background: rgba(123,47,247,.25); }
+
+  /* paletas de fondo por escena */
+  .scene { background: radial-gradient(1200px 700px at 50% 30%, #1a1230, #0a0713); }
+  .scene.dark   { background: radial-gradient(1100px 700px at 30% 20%, #241640, #0a0713); }
+  .scene.purple { background: linear-gradient(135deg, #5a1fc0, #9b4dff 60%, #c98bff); color:#fff; }
+  .scene.orange { background: linear-gradient(135deg, #ff6a00, #ff4d8d); color:#fff; }
+  .scene.cyan   { background: linear-gradient(135deg, #0096a8, #00bcd4 60%, #5fe0ef); color:#fff; }
+  .scene.light  { background: radial-gradient(1100px 700px at 70% 10%, #fff, #fff3e9); color: var(--ink); }
+  .scene.night  { background: radial-gradient(900px 600px at 80% 80%, #2a1b4d, #07050f); }
+
+  /* ===== Tipografía cine ===== */
+  .kicker { font-size: clamp(12px, 1.4vw, 15px); letter-spacing: 4px; text-transform: uppercase; font-weight: 800; opacity: .8; margin-bottom: 22px; }
+  .scene h1 { font-family: var(--display); font-weight: 700; font-size: clamp(38px, 7.5vw, 104px); line-height: 1; letter-spacing: -.02em; }
+  .scene h2 { font-family: var(--display); font-weight: 700; font-size: clamp(30px, 5.2vw, 68px); line-height: 1.05; letter-spacing: -.02em; }
+  .scene .lead { font-size: clamp(17px, 2.2vw, 26px); line-height: 1.45; font-weight: 600; opacity: .92; margin-top: 22px; max-width: 800px; }
+  .scene.center .lead { margin-left: auto; margin-right: auto; }
+  .big-num { font-family: var(--display); font-weight: 700; font-size: clamp(70px, 15vw, 200px); line-height: .9; letter-spacing: -.04em; }
+  .grad-o { background: linear-gradient(90deg,#ffd24d,#ff7a1a); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .grad-c { background: linear-gradient(90deg,#9bf6ff,#00bcd4); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .u-o { color: #ffd24d; } .u-c { color: #9bf6ff; } .u-p { color: #d9b8ff; } .u-pk { color: #ffb3cf; }
+
+  /* ===== Animaciones de ENTRADA (solo al activar la escena) ===== */
+  @keyframes rise { from { opacity:0; transform: translateY(40px);} to { opacity:1; transform:none;} }
+  @keyframes riseBig { 0%{opacity:0; transform: translateY(60px) scale(.9);} 60%{opacity:1; transform: translateY(-8px) scale(1.02);} 100%{opacity:1; transform:none;} }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+  @keyframes popCard { 0%{opacity:0; transform: translateY(28px) scale(.95);} 100%{opacity:1; transform:none;} }
+  @keyframes wipe { from { clip-path: inset(0 100% 0 0);} to { clip-path: inset(0 0 0 0);} }
+
+  /* elementos animables: ocultos hasta que la escena esté activa */
+  .scene .anim { opacity: 0; }
+  .scene.active .anim { animation: rise .7s cubic-bezier(.2,.9,.3,1) forwards; }
+  .scene.active .anim.big { animation: riseBig .8s cubic-bezier(.2,1.1,.3,1) forwards; }
+  .scene.active .anim.wipe { animation: wipe .9s cubic-bezier(.7,0,.3,1) forwards, fadeIn .3s forwards; }
+  /* retrasos en cascada */
+  .scene.active .d1{animation-delay:.10s} .scene.active .d2{animation-delay:.28s}
+  .scene.active .d3{animation-delay:.46s} .scene.active .d4{animation-delay:.64s}
+  .scene.active .d5{animation-delay:.82s} .scene.active .d6{animation-delay:1.0s}
+  .scene.active .d7{animation-delay:1.18s} .scene.active .d8{animation-delay:1.36s}
+
+  /* tarjetas / grids */
+  .row { display: grid; gap: 18px; margin-top: 30px; }
+  .r2 { grid-template-columns: 1fr 1fr; } .r3 { grid-template-columns: repeat(3,1fr); } .r4 { grid-template-columns: repeat(4,1fr); }
+  @media (max-width: 820px){ .r2,.r3,.r4 { grid-template-columns: 1fr; } }
+  .gcard {
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16);
+    border-radius: 18px; padding: 22px; backdrop-filter: blur(6px);
+    opacity: 0;
+  }
+  .scene.active .gcard { animation: popCard .6s cubic-bezier(.2,1.1,.3,1) forwards; }
+  .scene.active .gcard:nth-child(1){animation-delay:.45s} .scene.active .gcard:nth-child(2){animation-delay:.58s}
+  .scene.active .gcard:nth-child(3){animation-delay:.71s} .scene.active .gcard:nth-child(4){animation-delay:.84s}
+  .scene.active .gcard:nth-child(5){animation-delay:.97s} .scene.active .gcard:nth-child(6){animation-delay:1.10s}
+  .gcard .em { font-size: 34px; display: block; margin-bottom: 12px; }
+  .gcard h3 { font-family: var(--display); font-weight: 600; font-size: clamp(17px,2vw,21px); margin-bottom: 6px; }
+  .gcard p { font-size: clamp(13px,1.5vw,15.5px); line-height: 1.45; opacity: .85; font-weight: 600; }
+  .scene.light .gcard { background: #fff; border-color: var(--line); box-shadow: 0 10px 30px rgba(123,47,247,.10); }
+  .scene.light .gcard p { color: var(--ink-soft); opacity: 1; }
+
+  /* lista "antes vs después" */
+  .vs2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 28px; }
+  @media (max-width: 820px){ .vs2 { grid-template-columns: 1fr; } }
+  .panel { border-radius: 18px; padding: 24px; opacity: 0; }
+  .scene.active .panel.p1 { animation: popCard .6s ease forwards .35s; }
+  .scene.active .panel.p2 { animation: popCard .6s ease forwards .55s; }
+  .panel.bad { background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.4); }
+  .panel.good { background: rgba(123,47,247,.18); border: 1px solid rgba(217,184,255,.5); }
+  .panel h4 { font-family: var(--display); font-weight: 600; font-size: 20px; margin-bottom: 14px; }
+  .panel ul { list-style: none; display: grid; gap: 11px; }
+  .panel li { display: flex; gap: 10px; font-size: clamp(14px,1.6vw,17px); font-weight: 700; line-height: 1.35; }
+
+  /* flujo de etapas */
+  .pipe { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; align-items: center; }
+  .pstep { background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.2); border-radius: 14px; padding: 14px 18px; font-family: var(--display); font-weight: 600; font-size: clamp(14px,1.7vw,19px); opacity: 0; }
+  .scene.active .pstep { animation: popCard .5s ease forwards; }
+  .scene.active .pstep:nth-child(1){animation-delay:.3s} .scene.active .pstep:nth-child(3){animation-delay:.45s}
+  .scene.active .pstep:nth-child(5){animation-delay:.6s} .scene.active .pstep:nth-child(7){animation-delay:.75s}
+  .scene.active .pstep:nth-child(9){animation-delay:.9s} .scene.active .pstep:nth-child(11){animation-delay:1.05s}
+  .parr { opacity: 0; font-size: 22px; font-weight: 900; color: #ffd24d; }
+  .scene.active .parr { animation: fadeIn .4s ease forwards; }
+  .scene.active .parr:nth-child(2){animation-delay:.4s} .scene.active .parr:nth-child(4){animation-delay:.55s}
+  .scene.active .parr:nth-child(6){animation-delay:.7s} .scene.active .parr:nth-child(8){animation-delay:.85s}
+  .scene.active .parr:nth-child(10){animation-delay:1.0s}
+
+  /* tabla comparativa */
+  .ctable { width: 100%; border-collapse: collapse; margin-top: 26px; font-size: clamp(13px,1.5vw,16px); }
+  .ctable th, .ctable td { padding: 11px 16px; text-align: left; border-bottom: 1px solid rgba(255,255,255,.14); font-weight: 700; }
+  .ctable th { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; opacity: .7; }
+  .ctable th:nth-child(n+2), .ctable td:nth-child(n+2){ text-align: center; }
+  .ctable td:last-child, .ctable th:last-child { background: rgba(123,47,247,.25); }
+  .ctable tbody tr { opacity: 0; }
+  .scene.active .ctable tbody tr { animation: popCard .45s ease forwards; }
+  .scene.active .ctable tbody tr:nth-child(1){animation-delay:.35s} .scene.active .ctable tbody tr:nth-child(2){animation-delay:.45s}
+  .scene.active .ctable tbody tr:nth-child(3){animation-delay:.55s} .scene.active .ctable tbody tr:nth-child(4){animation-delay:.65s}
+  .scene.active .ctable tbody tr:nth-child(5){animation-delay:.75s} .scene.active .ctable tbody tr:nth-child(6){animation-delay:.85s}
+  .scene.active .ctable tbody tr:nth-child(7){animation-delay:.95s} .scene.active .ctable tbody tr:nth-child(8){animation-delay:1.05s}
+  .ok { color:#7CFFB2; font-weight:900; } .nok { color:#ff8a8a; font-weight:900; } .mid { color:#ffd24d; font-weight:900; }
+
+  /* Bongo animado al centro */
+  .bongo { font-size: clamp(70px,14vw,150px); display:inline-block; }
+  .scene.active .bongo { animation: riseBig .8s cubic-bezier(.2,1.1,.3,1) forwards, bob 3s ease-in-out 1s infinite; }
+  @keyframes bob { 0%,100%{ transform: translateY(0) rotate(-3deg);} 50%{ transform: translateY(-14px) rotate(3deg);} }
+
+  /* mockup chat de Bongo */
+  .chat { display: grid; gap: 12px; margin-top: 26px; max-width: 720px; }
+  .bubble { border-radius: 16px; padding: 14px 18px; font-size: clamp(14px,1.6vw,17px); font-weight: 700; line-height: 1.4; opacity: 0; max-width: 88%; }
+  .scene.active .bubble { animation: rise .55s ease forwards; }
+  .scene.active .bubble:nth-child(1){animation-delay:.3s} .scene.active .bubble:nth-child(2){animation-delay:.6s}
+  .scene.active .bubble:nth-child(3){animation-delay:.9s} .scene.active .bubble:nth-child(4){animation-delay:1.2s}
+  .bubble.bongo-b { background: linear-gradient(135deg,#7b2ff7,#b06bff); color:#fff; border-bottom-left-radius:4px; }
+  .bubble .who { display:block; font-size: 11px; letter-spacing:1px; text-transform: uppercase; opacity:.8; margin-bottom:4px; font-weight:800; }
+
+  /* logo */
+  .logo-img {
+    background-image: url("data:image/webp;base64,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");
+    background-size: contain; background-repeat: no-repeat;
+  }
+
+  /* ===== Barra de capítulos (navegación visible) ===== */
+  .chapters { position: fixed; top: 0; left: 0; right: 0; height: 4px; display: flex; gap: 3px; padding: 0 0; z-index: 40; }
+  .chapters span { flex: 1; background: rgba(255,255,255,.18); cursor: pointer; transition: background .3s; }
+  .chapters span.done { background: rgba(255,255,255,.45); }
+  .chapters span.cur { background: linear-gradient(90deg,#ff7a1a,#ff4d8d); }
+
+  /* HUD superior */
+  .hud { position: fixed; top: 16px; left: 22px; right: 22px; z-index: 40; display: flex; justify-content: space-between; align-items: center; pointer-events: none; }
+  .hud .lg { width: 86px; height: 28px; display:inline-block; opacity:.95; filter: drop-shadow(0 2px 6px rgba(0,0,0,.4)); }
+  .scene.light ~ .hud .lg { }
+  .hud .sc { font-size: 13px; font-weight: 800; letter-spacing: 1px; opacity: .7; font-variant-numeric: tabular-nums; }
+
+  /* Controles tipo reproductor (manual) */
+  .ctrls { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 40;
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(20,14,36,.7); border: 1px solid rgba(255,255,255,.16); border-radius: 999px;
+    padding: 9px 16px; backdrop-filter: blur(10px); }
+  .ctrls button { border: none; cursor: pointer; background: transparent; color: #fff; font-weight: 800; }
+  .ctrls .nav { width: 42px; height: 42px; border-radius: 999px; background: linear-gradient(135deg,#ff7a1a,#ff4d8d); font-size: 18px; display:grid; place-items:center; transition: transform .15s; }
+  .ctrls .nav:hover { transform: scale(1.08); }
+  .ctrls .nav:disabled { opacity: .3; cursor: default; transform:none; }
+  .ctrls .ico { width: 38px; height: 38px; border-radius: 999px; background: rgba(255,255,255,.12); font-size: 15px; display:grid; place-items:center; }
+  .ctrls .ico:hover { background: rgba(255,255,255,.22); }
+  .ctrls .ico.off { opacity: .45; }
+  .ctrls .lbl { font-size: 13px; opacity:.75; font-weight:800; min-width: 54px; text-align:center; font-variant-numeric: tabular-nums; }
+
+  .hint { position: fixed; bottom: 26px; right: 26px; z-index: 40; font-size: 12px; opacity: .55; font-weight: 700; }
+  @media (max-width: 760px){ .hint { display:none; } }
+
+  /* confeti */
+  .confetti { position: fixed; inset: 0; pointer-events: none; z-index: 35; overflow: hidden; }
+  .confetti i { position: absolute; top: -16px; width: 10px; height: 14px; border-radius: 2px; }
+  @keyframes fall { 0%{ transform: translateY(-20px) rotate(0); opacity:1;} 100%{ transform: translateY(108vh) rotate(720deg); opacity:.9;} }
+
+  /* ===================== MOCKUPS DE PRODUCTO ("cómo se ve") ===================== */
+  .mock {
+    margin-top: 26px; background: var(--surface); color: var(--ink);
+    border-radius: 18px; overflow: hidden; box-shadow: 0 30px 70px rgba(0,0,0,.4);
+    border: 1px solid rgba(255,255,255,.2); opacity: 0;
+  }
+  .scene.active .mock { animation: popCard .7s cubic-bezier(.2,1.1,.3,1) forwards .35s; }
+  .mock .bar { display:flex; align-items:center; gap:8px; padding:10px 14px; background:#f3edf8; border-bottom:1px solid var(--line); }
+  .mock .bar .dot { width:11px; height:11px; border-radius:50%; }
+  .mock .bar .t { margin-left:8px; font-weight:800; font-size:13px; color:var(--ink-soft); }
+  .mock .body { padding: 14px; }
+
+  /* calendario */
+  .mk-cal { display:grid; grid-template-columns: 64px repeat(3,1fr); font-size: clamp(10px,1.1vw,12.5px); }
+  .mk-cal .c { border-right:1px solid var(--line); border-bottom:1px solid var(--line); min-height:42px; padding:5px; }
+  .mk-cal .c.h { background:#faf6fd; font-weight:800; text-align:center; color:var(--ink-soft); min-height:auto; padding:8px 4px; }
+  .mk-cal .c.tm { background:#faf6fd; text-align:right; padding-right:8px; font-weight:700; color:var(--ink-soft); }
+  .mk-ev { border-radius:7px; padding:5px 7px; color:#fff; font-weight:800; font-size: clamp(9px,1vw,11px); line-height:1.2; }
+  .mk-ev.o{background:var(--orange)} .mk-ev.p{background:var(--purple)} .mk-ev.c{background:var(--cyan)} .mk-ev.pk{background:var(--pink)}
+  .mk-block { background: repeating-linear-gradient(45deg,#fde8e8,#fde8e8 6px,#fff 6px,#fff 12px); color:var(--red); font-weight:800; border-radius:7px; padding:5px; font-size:10px; }
+
+  /* ficha de cliente */
+  .mk-lead { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+  @media (max-width:760px){ .mk-lead { grid-template-columns:1fr; } }
+  .mk-lead .col { display:grid; gap:9px; }
+  .mk-field { background:#faf6fd; border:1px solid var(--line); border-radius:10px; padding:9px 12px; }
+  .mk-field .k { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--ink-soft); font-weight:800; }
+  .mk-field .v { font-size: clamp(12px,1.4vw,15px); font-weight:800; color:var(--ink); margin-top:2px; }
+  .mk-chip { display:inline-block; font-size:11px; font-weight:800; padding:3px 9px; border-radius:999px; }
+  .mk-chip.win{ background:color-mix(in srgb,var(--green) 16%,white); color:#119a5d; }
+  .mk-time { display:grid; gap:8px; }
+  .mk-time .ti { display:flex; gap:9px; align-items:flex-start; font-size: clamp(11px,1.3vw,13.5px); font-weight:700; }
+  .mk-time .av { flex-shrink:0; width:24px; height:24px; border-radius:7px; background:var(--purple); color:#fff; display:grid; place-items:center; font-size:12px; }
+
+  /* dashboard de dirección */
+  .mk-kpis { display:grid; grid-template-columns: repeat(4,1fr); gap:10px; }
+  @media (max-width:760px){ .mk-kpis { grid-template-columns: 1fr 1fr; } }
+  .mk-kpi { background:#faf6fd; border:1px solid var(--line); border-radius:12px; padding:12px; }
+  .mk-kpi .n { font-family:var(--display); font-weight:700; font-size: clamp(18px,2.4vw,26px); }
+  .mk-kpi .l { font-size:11px; color:var(--ink-soft); font-weight:800; margin-top:2px; }
+  .mk-bars { display:flex; align-items:flex-end; gap:10px; height:90px; margin-top:14px; padding:0 4px; }
+  .mk-bars .bcol { flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; }
+  .mk-bars .bv { width:100%; border-radius:7px 7px 0 0; background:linear-gradient(180deg,var(--purple),var(--cyan)); }
+  .mk-bars .bl { font-size:10px; color:var(--ink-soft); font-weight:800; }
+
+  /* ===================== RESPONSIVE: laptop / escritorio / móvil ===================== */
+  /* Escritorio grande: limitar ancho de lectura, tamaños cómodos (base ya cubierta por clamp) */
+
+  /* Laptop (≤ 1280px): reducir padding lateral */
+  @media (max-width: 1280px){
+    .scene { padding: 7vh clamp(28px, 7vw, 110px); }
+  }
+
+  /* Tablet (≤ 900px): grids de 3-4 a 2 columnas, ajustar HUD */
+  @media (max-width: 900px){
+    .row.r3, .row.r4 { grid-template-columns: 1fr 1fr; }
+    .vs2 { grid-template-columns: 1fr; }
+    .hud .lg { width: 72px; height: 24px; }
+    .ctable th, .ctable td { padding: 9px 10px; }
+  }
+
+  /* Móvil (≤ 640px): una columna, padding compacto, controles y HUD adaptados */
+  @media (max-width: 640px){
+    .scene { padding: 66px 18px 92px; align-items: center; text-align: center; overflow-y: auto; }
+    .scene .inner { text-align: center; margin: 0 auto; }   /* arranca arriba, scroll natural */
+    .scene h1 { font-size: clamp(34px, 11vw, 52px); }
+    .scene h2 { font-size: clamp(26px, 8.5vw, 40px); }
+    .scene .lead { font-size: clamp(15px, 4.4vw, 19px); margin-left:auto; margin-right:auto; }
+    .scene .lead br, .scene h1 br, .scene h2 br { display: none; }  /* dejar que el texto fluya */
+    .big-num { font-size: clamp(72px, 28vw, 130px); }
+    .kicker { letter-spacing: 2.5px; margin-bottom: 14px; }
+    .row, .vs2 { margin-top: 22px; gap: 12px; }
+    .row.r2, .row.r3, .row.r4 { grid-template-columns: 1fr; }
+    .gcard { padding: 16px; text-align: left; }
+    .gcard .em { font-size: 28px; margin-bottom: 8px; }
+    .chat { margin: 22px auto 0; }
+    .bubble { max-width: 100%; text-align: left; }
+    /* tabla comparativa: scroll horizontal para no romper */
+    .ctable { display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+    .pipe { justify-content: center; }
+    /* HUD y controles compactos */
+    .hud { top: 12px; left: 14px; right: 14px; }
+    .hud .lg { width: 64px; height: 22px; }
+    .hud .sc { font-size: 12px; }
+    .ctrls { bottom: 14px; gap: 8px; padding: 7px 12px; }
+    .ctrls .nav { width: 44px; height: 44px; font-size: 19px; }  /* táctil cómodo */
+    .ctrls .ico { width: 40px; height: 40px; }
+    .ctrls .lbl { font-size: 12px; min-width: 42px; }
+    .bongo { font-size: clamp(64px, 22vw, 100px) !important; }
+    /* mockups: caben sin cortarse */
+    .mock { margin-top: 20px; }
+    .mock .body { padding: 10px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .mk-cal { min-width: 460px; }            /* el calendario hace scroll lateral si no cabe */
+    .mk-cal .c { min-height: 34px; }
+    .mk-lead { grid-template-columns: 1fr; }
+    .mk-kpis { grid-template-columns: 1fr 1fr; }
+    .mk-bars { height: 64px; gap: 5px; min-width: 420px; }  /* 9 barras: scroll lateral en móvil */
+    .mk-bars .bl { font-size: 9px; }
+    .mock .bar .t { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  }
+
+  /* pantallas muy bajas (laptops 13" en horizontal): compactar para que quepa */
+  @media (max-height: 720px){
+    .scene { padding-top: 68px; padding-bottom: 92px; }   /* mantiene aire para HUD/controles */
+    .scene h1 { font-size: clamp(34px, 6vw, 68px); }
+    .scene h2 { font-size: clamp(26px, 4.6vw, 52px); }
+    .scene .lead { font-size: clamp(15px, 1.9vw, 20px); margin-top: 14px; }
+    .kicker { margin-bottom: 14px; }
+    .row, .vs2, .mock, .chat { margin-top: 16px; gap: 12px; }
+    .gcard { padding: 16px; }
+    .big-num { font-size: clamp(64px, 12vw, 150px); }
+    .mk-bars { height: 72px; }
+  }
+  @media (max-height: 560px){
+    .scene { padding-top: 60px; padding-bottom: 84px; }
+    .row, .vs2, .mock, .chat { margin-top: 12px; }
+    .gcard p { font-size: 12.5px; }
+  }
+
+  /* dispositivos táctiles: ocultar pista de teclado */
+  @media (hover: none) and (pointer: coarse){ .hint { display: none; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .scene .anim, .gcard, .panel, .pstep, .parr, .ctable tbody tr, .bubble { opacity: 1 !important; animation: none !important; }
+    .bongo { animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="confetti" id="confetti" aria-hidden="true"></div>
+<div class="chapters" id="chapters" aria-hidden="true"></div>
+
+<div class="hud">
+  <span class="logo-img lg" aria-label="Jump-In"></span>
+  <span class="sc"><span id="scN">01</span> / <span id="scT">12</span></span>
+</div>
+
+<div class="stage" id="stage">
+
+  <!-- ESCENA 1 · Apertura -->
+  <section class="scene center night active">
+    <div class="inner">
+      <div class="bongo anim d1" style="font-size:72px">🐵</div>
+      <h1 class="anim big d2" style="margin-top:6px">Jump-In <span class="grad-o">CRM</span></h1>
+      <p class="lead anim d4">La plataforma que opera la diversión de las 9 sucursales —<br/>movida por <b class="u-p">Bongo Assistant</b>.</p>
+      <p class="anim d6" style="margin-top:34px; opacity:.6; font-weight:800; letter-spacing:1px">▸ Avanza con clic o la flecha derecha →</p>
+    </div>
+  </section>
+
+  <!-- ESCENA 2 · El problema (caos de sistemas) -->
+  <section class="scene dark">
+    <div class="inner">
+      <span class="kicker anim d1 u-pk">El reto de hoy</span>
+      <h2 class="anim d2">9 sucursales.<br/><span class="grad-o">Varios sistemas que no se hablan.</span></h2>
+      <p class="lead anim d3">DataBiz por un lado, HubSpot por otro, WhatsApp y Excel aparte.<br/>Llevar el control en todos a la vez es un <b class="u-pk">caos</b>.</p>
+      <div class="row r3">
+        <div class="gcard"><span class="em">🗂️</span><h3>Datos en silos</h3><p>La info del cliente vive en pedazos, nunca completa.</p></div>
+        <div class="gcard"><span class="em">🙈</span><h3>Sin visión total</h3><p>Dirección no ve las 9 sucursales en un solo lugar.</p></div>
+        <div class="gcard"><span class="em">💸</span><h3>Doble costo y captura</h3><p>Se paga y se mantiene más de un sistema a la vez.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ESCENA 3 · El número que duele -->
+  <section class="scene orange center">
+    <div class="inner">
+      <span class="kicker anim d1">Lo que más cuesta</span>
+      <div class="big-num anim big d2">80%</div>
+      <h2 class="anim d3" style="margin-top:8px">de las ventas se pierden<br/>por falta de <u>seguimiento</u>.</h2>
+      <p class="lead anim d5">Preguntan por una fiesta… y luego silencio. El equipo está atendiendo el parque, no persiguiendo cotizaciones.</p>
+    </div>
+  </section>
+
+  <!-- ESCENA 4 · La solución -->
+  <section class="scene light">
+    <div class="inner">
+      <span class="kicker anim d1" style="color:var(--purple)">La solución</span>
+      <h2 class="anim d2">Un solo sistema.<br/><span class="grad-o">Una sola fuente de verdad.</span></h2>
+      <p class="lead anim d3" style="color:var(--ink-soft)">Jump-In CRM <b style="color:var(--ink)">reemplaza DataBiz y HubSpot</b> y unifica todo el ciclo — con Bongo trabajando la base por ti.</p>
+      <div class="row r3">
+        <div class="gcard"><span class="em">🎯</span><h3>Captar</h3><p>Leads de web, WhatsApp e IG en un solo embudo.</p></div>
+        <div class="gcard"><span class="em">📅</span><h3>Agendar</h3><p>Calendario con aforo: cero dobles reservas.</p></div>
+        <div class="gcard"><span class="em">💳</span><h3>Cobrar</h3><p>Cotización, anticipo y saldo, todo registrado.</p></div>
+        <div class="gcard"><span class="em">🎈</span><h3>Ejecutar</h3><p>Waiver y check-in rápido el día del evento.</p></div>
+        <div class="gcard"><span class="em">🐵</span><h3>Seguir</h3><p><b>Bongo</b> da seguimiento 24/7. El diferenciador.</p></div>
+        <div class="gcard"><span class="em">📊</span><h3>Medir</h3><p>Ocupación, ingresos y conversión en vivo.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ESCENA 5 · Conoce a Bongo -->
+  <section class="scene purple center">
+    <div class="inner">
+      <span class="kicker anim d1">El diferenciador</span>
+      <div class="bongo">🐵</div>
+      <h2 class="anim d3" style="margin-top:6px">Bongo Assistant</h2>
+      <p class="lead anim d4">No es un chatbot. Es el <b>cerebro</b> que <b class="u-o">decide</b>, <b class="u-o">actúa</b> y <b class="u-o">registra</b> el seguimiento de cada cliente — solo, 24/7.</p>
+      <p class="anim d6" style="margin-top:20px; font-weight:800; font-size:clamp(15px,1.8vw,20px)">Como un vendedor que nunca duerme, nunca se le olvida<br/>y trabaja para las 9 sucursales a la vez.</p>
+    </div>
+  </section>
+
+  <!-- ESCENA 6 · Bongo en acción (chat) -->
+  <section class="scene night">
+    <div class="inner">
+      <span class="kicker anim d1 u-c">Bongo en acción</span>
+      <h2 class="anim d2">El seguimiento que nadie<br/>alcanza a hacer a mano.</h2>
+      <div class="chat">
+        <div class="bubble bongo-b"><span class="who">Bongo · lead nuevo a medianoche</span>Hola 👋 ¿Para cuántos peques es la fiesta y qué fecha tienes en mente? Te armo la cotización al instante.</div>
+        <div class="bubble bongo-b"><span class="who">Bongo · cotización sin respuesta (24 h)</span>¿Sigue en pie tu fiesta del 12? Aparté la sala; con $1,000 de anticipo la dejo confirmada 🎉</div>
+        <div class="bubble bongo-b"><span class="who">Bongo · 3 días antes</span>Tu fiesta es el sábado 13:00. Recuerda el saldo y firma los waivers aquí para entrar más rápido.</div>
+        <div class="bubble bongo-b"><span class="who">Bongo · un año después</span>¡El cumple de Mateo se acerca otra vez! 🎂 ¿Lo celebramos de nuevo? Tengo fechas de mayo.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ESCENA 7 · El corazón: calendario con aforo -->
+  <section class="scene cyan center">
+    <div class="inner">
+      <span class="kicker anim d1">El corazón de la operación</span>
+      <h2 class="anim big d2">Imposible empalmar<br/>dos fiestas.</h2>
+      <p class="lead anim d4">Reservas por <b>sucursal → sala → fecha y hora</b>, con control de aforo. El sistema bloquea solapamientos y avisa cuando una sala se llena.</p>
+      <p class="anim d6" style="margin-top:18px; font-weight:800">Y Bongo solo ofrece fechas <u>realmente</u> disponibles.</p>
+    </div>
+  </section>
+
+  <!-- ESCENA 8 · Pipeline -->
+  <section class="scene dark">
+    <div class="inner">
+      <span class="kicker anim d1 u-o">Del primer mensaje a la fiesta</span>
+      <h2 class="anim d2">Cada evento, en una<br/>ruta clara hasta cerrar.</h2>
+      <div class="pipe">
+        <span class="pstep">Lead</span><span class="parr">→</span>
+        <span class="pstep">Cotizado</span><span class="parr">→</span>
+        <span class="pstep">Apartado</span><span class="parr">→</span>
+        <span class="pstep">Confirmado</span><span class="parr">→</span>
+        <span class="pstep">Realizado</span><span class="parr">→</span>
+        <span class="pstep" style="background:rgba(123,47,247,.35);border-color:#d9b8ff">Recurrencia 🔁</span>
+      </div>
+      <p class="lead anim d6" style="margin-top:30px">Bongo empuja los que se atoran. Nadie se enfría sin querer.</p>
+    </div>
+  </section>
+
+  <!-- ESCENA 9 · Toda la operación del parque -->
+  <section class="scene light">
+    <div class="inner">
+      <span class="kicker anim d1" style="color:var(--cyan)">No solo fiestas</span>
+      <h2 class="anim d2">El parque <span class="grad-c">completo</span>.</h2>
+      <div class="row r3">
+        <div class="gcard"><span class="em">🎟️</span><h3>Aforo por horario</h3><p>Cupo de saltadores por franja: seguridad y sin sobrevender.</p></div>
+        <div class="gcard"><span class="em">🪪</span><h3>Membresías y pases</h3><p>"Jump Club" e ingreso recurrente; Bongo renueva solo.</p></div>
+        <div class="gcard"><span class="em">🔄</span><h3>Cancelaciones + lista de espera</h3><p>Reprogramar sin perder anticipo; Bongo avisa al siguiente.</p></div>
+        <div class="gcard"><span class="em">📝</span><h3>Registro / waiver</h3><p>El registro de responsable, integrado al cliente y al marketing.</p></div>
+        <div class="gcard"><span class="em">🎈</span><h3>Check-in del día</h3><p>Tablero por sucursal, staff asignado, entrada rápida.</p></div>
+        <div class="gcard"><span class="em">🏢</span><h3>Multi-sucursal</h3><p>Cada sucursal lo suyo; dirección ve las 9.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ESCENA 10 · Cómo se ve · Calendario -->
+  <section class="scene light">
+    <div class="inner">
+      <span class="kicker anim d1" style="color:var(--cyan)">Cómo se ve · Calendario</span>
+      <h2 class="anim d2">El calendario con aforo, en vivo.</h2>
+      <div class="mock">
+        <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="t">📍 Jump-In CDMX · Sábado 12 jul · 1 de 9 sucursales</span></div>
+        <div class="body">
+          <div class="mk-cal">
+            <div class="c h">Hora</div><div class="c h">Sala Bongo</div><div class="c h">Sala Arena</div><div class="c h">Corporativo</div>
+            <div class="c tm">12:00</div><div class="c"><div class="mk-ev o">🎂 Mateo · 15 niños</div></div><div class="c"></div><div class="c"><div class="mk-ev c">🏢 Acme · team building</div></div>
+            <div class="c tm">13:30</div><div class="c"></div><div class="c"><div class="mk-ev p">🎂 Sofía · 20 niños</div></div><div class="c"></div>
+            <div class="c tm">15:00</div><div class="c"><div class="mk-ev pk">🎂 Diego · 12 niños</div></div><div class="c"></div><div class="c"><div class="mk-block">⛔ Bloqueado</div></div>
+          </div>
+        </div>
+      </div>
+      <p class="lead anim d4" style="color:var(--ink-soft); margin-top:18px">Cada sala, cada horario, su aforo. Imposible empalmar dos fiestas.</p>
+    </div>
+  </section>
+
+  <!-- ESCENA 11 · Cómo se ve · Ficha de cliente -->
+  <section class="scene light">
+    <div class="inner">
+      <span class="kicker anim d1" style="color:var(--purple)">Cómo se ve · Ficha del cliente</span>
+      <h2 class="anim d2">Todo el cliente, en una pantalla.</h2>
+      <div class="mock">
+        <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="t">👤 Familia Ramírez · Cumple de Mateo</span></div>
+        <div class="body">
+          <div class="mk-lead">
+            <div class="col">
+              <div class="mk-field"><div class="k">Estado</div><div class="v"><span class="mk-chip win">● Confirmado · anticipo pagado</span></div></div>
+              <div class="mk-field"><div class="k">Evento</div><div class="v">12 jul · 15:00 · Sala Bongo · 12 niños</div></div>
+              <div class="mk-field"><div class="k">Total / saldo</div><div class="v">$5,400 · resta $2,400</div></div>
+              <div class="mk-field"><div class="k">Origen</div><div class="v">WhatsApp · campaña "Cumple feliz"</div></div>
+            </div>
+            <div class="col">
+              <div class="mk-field"><div class="k">Bitácora (Bongo + equipo)</div>
+                <div class="mk-time" style="margin-top:8px">
+                  <div class="ti"><span class="av">🐵</span><span>Bongo dio seguimiento a la cotización (24 h)</span></div>
+                  <div class="ti"><span class="av">🐵</span><span>Bongo confirmó la fecha tras el anticipo</span></div>
+                  <div class="ti"><span class="av" style="background:var(--cyan)">👩</span><span>Ana asignó anfitrión para el evento</span></div>
+                  <div class="ti"><span class="av">🐵</span><span>Recordatorio de saldo y waiver programado (-3 días)</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="lead anim d4" style="color:var(--ink-soft); margin-top:18px">Sin saltar entre DataBiz, HubSpot y WhatsApp. Una sola ficha.</p>
+    </div>
+  </section>
+
+  <!-- ESCENA 12 · Cómo se ve · Tablero de dirección -->
+  <section class="scene light">
+    <div class="inner">
+      <span class="kicker anim d1" style="color:var(--orange)">Cómo se ve · Dirección</span>
+      <h2 class="anim d2">Las 9 sucursales, de un vistazo.</h2>
+      <div class="mock">
+        <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="t">📊 Tablero de dirección · este mes</span></div>
+        <div class="body">
+          <div class="mk-kpis">
+            <div class="mk-kpi"><div class="n grad-o">$1.84M</div><div class="l">Ingresos (9 suc.)</div></div>
+            <div class="mk-kpi"><div class="n" style="color:var(--cyan)">78%</div><div class="l">Ocupación salas</div></div>
+            <div class="mk-kpi"><div class="n" style="color:var(--purple)">41%</div><div class="l">Conversión lead→evento</div></div>
+            <div class="mk-kpi"><div class="n" style="color:var(--green)">312</div><div class="l">Eventos realizados</div></div>
+          </div>
+          <div class="mk-bars">
+            <div class="bcol"><div class="bv" style="height:70%"></div><div class="bl">CDMX</div></div>
+            <div class="bcol"><div class="bv" style="height:90%"></div><div class="bl">Satélite</div></div>
+            <div class="bcol"><div class="bv" style="height:55%"></div><div class="bl">Cuerna.</div></div>
+            <div class="bcol"><div class="bv" style="height:80%"></div><div class="bl">Coapa</div></div>
+            <div class="bcol"><div class="bv" style="height:65%"></div><div class="bl">Pue.</div></div>
+            <div class="bcol"><div class="bv" style="height:48%"></div><div class="bl">Toluca</div></div>
+            <div class="bcol"><div class="bv" style="height:85%"></div><div class="bl">Inter.</div></div>
+            <div class="bcol"><div class="bv" style="height:60%"></div><div class="bl">León</div></div>
+            <div class="bcol"><div class="bv" style="height:72%"></div><div class="bl">Qro.</div></div>
+          </div>
+        </div>
+      </div>
+      <p class="lead anim d4" style="color:var(--ink-soft); margin-top:16px">Decisiones con datos reales, no con corazonadas. <span class="muted" style="opacity:.7">(cifras ilustrativas)</span></p>
+    </div>
+  </section>
+
+  <!-- ESCENA 13 · Comparativa -->
+  <section class="scene dark">
+    <div class="inner">
+      <span class="kicker anim d1 u-pk">Por qué reemplazar lo actual</span>
+      <h2 class="anim d2">Uno en lugar de <span class="grad-o">tres</span>.</h2>
+      <table class="ctable">
+        <thead><tr><th>Lo que necesita Jump-In</th><th>DataBiz</th><th>HubSpot</th><th>Jump-In CRM</th></tr></thead>
+        <tbody>
+          <tr><td>Una sola fuente de verdad (9 sucursales)</td><td class="nok">✕</td><td class="nok">✕</td><td class="ok">✓</td></tr>
+          <tr><td>Calendario con aforo y anti-empalme</td><td class="mid">parcial</td><td class="nok">✕</td><td class="ok">✓</td></tr>
+          <tr><td>Cotizador de paquetes + extras</td><td class="mid">parcial</td><td class="mid">genérico</td><td class="ok">✓</td></tr>
+          <tr><td>Registro/waiver integrado</td><td class="mid">aparte</td><td class="nok">✕</td><td class="ok">✓</td></tr>
+          <tr><td>Seguimiento automático con IA (Bongo)</td><td class="nok">✕</td><td class="mid">de pago</td><td class="ok">✓</td></tr>
+          <tr><td>Reactivación de recurrencia</td><td class="nok">✕</td><td class="mid">manual</td><td class="ok">✓</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ESCENA 14 · Impacto -->
+  <section class="scene purple">
+    <div class="inner">
+      <span class="kicker anim d1">El impacto</span>
+      <h2 class="anim d2">Lo que gana Jump-In.</h2>
+      <div class="row r2">
+        <div class="gcard"><span class="em">💰</span><h3>Más eventos cerrados</h3><p>Bongo persigue cada cotización 24/7: menos fugas.</p></div>
+        <div class="gcard"><span class="em">🛡️</span><h3>Cero dobles reservas</h3><p>El aforo protege la experiencia y evita conflictos.</p></div>
+        <div class="gcard"><span class="em">🔁</span><h3>Clientes que regresan</h3><p>Reactivación de recurrencia que hoy se pierde.</p></div>
+        <div class="gcard"><span class="em">👀</span><h3>Visión total de las 9</h3><p>Ingresos, ocupación y conversión en un solo lugar.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ESCENA 15 · Cierre -->
+  <section class="scene center night">
+    <div class="inner">
+      <div class="bongo anim d1" style="font-size:64px">🐵</div>
+      <h1 class="anim big d2" style="font-size:clamp(34px,6vw,80px)">Que Jump-In opere<br/>como se <span class="grad-o">divierte</span>.</h1>
+      <p class="lead anim d4">Una plataforma para las 9 sucursales que reemplaza DataBiz y HubSpot,<br/>con <b class="u-p">Bongo Assistant</b> 24/7. Más eventos, menos caos, visión total.</p>
+      <p class="anim d6" style="margin-top:34px; opacity:.7; font-weight:800; letter-spacing:1px">Propuesta · Jordan Memije · FDE · En aprobación</p>
+    </div>
+  </section>
+
+</div>
+
+<!-- Controles manuales -->
+<div class="ctrls">
+  <button class="nav" id="prev" aria-label="Anterior">‹</button>
+  <span class="lbl"><span id="lblN">1</span>/<span id="lblT">12</span></span>
+  <button class="nav" id="next" aria-label="Siguiente">›</button>
+  <button class="ico" id="full" title="Pantalla completa">⛶</button>
+  <button class="ico off" id="sound" title="Activar/silenciar sonido">🔇</button>
+</div>
+<div class="hint">← → o clic para avanzar · F pantalla completa</div>
+
+<script>
+  const scenes = Array.from(document.querySelectorAll('.scene'));
+  const total = scenes.length;
+  let i = 0, soundOn = false, actx = null;
+
+  const chaptersWrap = document.getElementById('chapters');
+  const scN = document.getElementById('scN'), scT = document.getElementById('scT');
+  const lblN = document.getElementById('lblN'), lblT = document.getElementById('lblT');
+  scT.textContent = String(total).padStart(2,'0');
+  lblT.textContent = total;
+
+  // capítulos (barra superior segmentada, clicable)
+  scenes.forEach((_, idx) => {
+    const s = document.createElement('span');
+    s.addEventListener('click', () => go(idx));
+    chaptersWrap.appendChild(s);
+  });
+  const chips = Array.from(chaptersWrap.children);
+
+  // ===== sonido opcional (Web Audio, sin archivos) =====
+  function ensureAudio(){ if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } }
+  function beep(f,d,t,v){ if(!soundOn||!actx) return; const o=actx.createOscillator(),g=actx.createGain();
+    o.type=t||'sine'; o.frequency.value=f; g.gain.value=0; o.connect(g); g.connect(actx.destination);
+    const n=actx.currentTime; g.gain.linearRampToValueAtTime(v||0.05,n+0.012); g.gain.exponentialRampToValueAtTime(0.0001,n+(d||0.16)); o.start(n); o.stop(n+(d||0.16)+0.02); }
+  function whoosh(){ beep(480,0.16,'triangle',0.045); setTimeout(()=>beep(700,0.12,'sine',0.035),60); }
+  function tada(){ [523,659,784,1047].forEach((f,k)=>setTimeout(()=>beep(f,0.22,'triangle',0.06),k*100)); }
+
+  // ===== confeti =====
+  const conf = document.getElementById('confetti');
+  const COLORS = ['#ff7a1a','#7b2ff7','#00bcd4','#ff4d8d','#ffc83d','#1fbf75'];
+  function burst(n){ n=n||80; for(let k=0;k<n;k++){ const p=document.createElement('i'); const c=COLORS[k%COLORS.length];
+    p.style.left=(Math.floor((k/n)*100)+(k%7))+'vw'; p.style.background=c; const sz=7+(k%6); p.style.width=sz+'px'; p.style.height=(sz+4)+'px';
+    const dur=2.6+(k%10)*0.18, del=(k%12)*0.05; p.style.animation=`fall ${dur}s linear ${del}s forwards`; if(k%3===0)p.style.borderRadius='50%';
+    conf.appendChild(p); setTimeout(()=>p.remove(),(dur+del)*1000+200);} }
+
+  // ===== navegación (manual) =====
+  function go(n){
+    i = Math.max(0, Math.min(total-1, n));
+    scenes.forEach((s,idx)=> s.classList.toggle('active', idx===i));
+    chips.forEach((c,idx)=>{ c.classList.toggle('cur', idx===i); c.classList.toggle('done', idx<i); });
+    scN.textContent = String(i+1).padStart(2,'0');
+    lblN.textContent = i+1;
+    document.getElementById('prev').disabled = i===0;
+    document.getElementById('next').disabled = i===total-1;
+    whoosh();
+    if(i===0 || i===total-1){ setTimeout(()=>burst(i===total-1?110:70),200); if(i===total-1) setTimeout(tada,260); }
+  }
+
+  document.getElementById('prev').addEventListener('click', ()=>{ ensureAudio(); go(i-1); });
+  document.getElementById('next').addEventListener('click', ()=>{ ensureAudio(); go(i+1); });
+  document.getElementById('full').addEventListener('click', toggleFull);
+  document.getElementById('sound').addEventListener('click', (e)=>{ ensureAudio(); soundOn=!soundOn;
+    e.currentTarget.textContent = soundOn?'🔊':'🔇'; e.currentTarget.classList.toggle('off',!soundOn); if(soundOn) whoosh(); });
+
+  function toggleFull(){ if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }
+
+  // avanzar con clic en la escena (zona central), sin estorbar a los controles
+  document.getElementById('stage').addEventListener('click', (e)=>{ ensureAudio(); go(i+1); });
+
+  document.addEventListener('keydown', (e)=>{
+    if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){ e.preventDefault(); ensureAudio(); go(i+1); }
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){ e.preventDefault(); go(i-1); }
+    else if(e.key==='Home'){ go(0); }
+    else if(e.key==='End'){ go(total-1); }
+    else if(e.key.toLowerCase()==='f'){ toggleFull(); }
+  });
+
+  go(0);
+</script>
+</body>
+</html>
